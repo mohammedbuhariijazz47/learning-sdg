@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+:root {
+  --background: #eef2f7;
+  --foreground: #0f172a;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-varela-round), "Trebuchet MS", "Segoe UI", sans-serif;
+  overflow-x: hidden;
+}
+
+@layer utilities {
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(59, 130, 246, 0.45) rgba(148, 163, 184, 0.25);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(148, 163, 184, 0.25);
+    border-radius: 9999px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: linear-gradient(#60a5fa, #3b82f6);
+    border-radius: 9999px;
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
