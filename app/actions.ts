@@ -352,7 +352,7 @@ export async function generateAnswer(question: string, language: Language = "en"
       description: "Detailed Professional Report",
       text: SDG_REPORT,
       source: "UN SDG Framework",
-      image: "/SDG Photos/SDG.jpeg",
+      image: "/SDG photos/SDG.jpeg",
       url: null,
     };
   }

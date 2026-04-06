@@ -54,7 +54,7 @@ const imageMap: Record<string, string> = {
 
 export function findSDGAnswer(query: string): { text: string; image: string } | null {
   const qLower = query.toLowerCase().replace(/[^a-z0-9\s]/g, "");
-  const defaultImage = "/SDG Photos/SDG.jpeg";
+  const defaultImage = "/SDG photos/SDG.jpeg";
   
   const match = qLower.match(/sdg\s*(\d+)/);
   if (match) {
@@ -62,7 +62,7 @@ export function findSDGAnswer(query: string): { text: string; image: string } | 
     const sdgObj = SDG_QA.find(qa => qa.q === `What is SDG ${num}`);
     if (sdgObj) {
       const imgFileName = imageMap[num] || "SDG.jpeg";
-      return { text: sdgObj.a, image: `/SDG Photos/${imgFileName}` };
+      return { text: sdgObj.a, image: `/SDG photos/${imgFileName}` };
     }
   }
 
