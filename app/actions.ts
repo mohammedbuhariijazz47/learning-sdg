@@ -338,9 +338,9 @@ export async function generateAnswer(question: string, language: Language = "en"
     return {
       title: "Sustainable Development Goals",
       description: "Specific Q&A",
-      text: exactAnswer,
+      text: exactAnswer.text,
       source: "UN SDG Framework",
-      image: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Sustainable_Development_Goals.svg/1024px-Sustainable_Development_Goals.svg.png",
+      image: exactAnswer.image,
       url: null,
     };
   }
@@ -352,7 +352,7 @@ export async function generateAnswer(question: string, language: Language = "en"
       description: "Detailed Professional Report",
       text: SDG_REPORT,
       source: "UN SDG Framework",
-      image: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/Sustainable_Development_Goals.svg/1024px-Sustainable_Development_Goals.svg.png",
+      image: "/SDG Photos/SDG.jpeg",
       url: null,
     };
   }

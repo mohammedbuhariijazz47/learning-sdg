@@ -32,30 +32,57 @@ export const SDG_QA = [
   { q: "How can engineering projects support SDGs", a: "Engineering projects can support SDGs through:\n- Renewable energy systems\n- Smart irrigation systems\n- Waste management technologies\n- Smart city solutions" }
 ];
 
-export function findSDGAnswer(query: string): string | null {
+const imageMap: Record<string, string> = {
+  "1": "SDG 1.png",
+  "2": "SDG  2.png",
+  "3": "SDG  3.jpeg",
+  "4": "SDG 4.png",
+  "5": "SDG 5.png",
+  "6": "SDG 6.png",
+  "7": "SDG 7.png",
+  "8": "SDG 8.png",
+  "9": "SDG 9.png",
+  "10": "SDG 10.png",
+  "11": "SDG 11.png",
+  "12": "SDG 12.png",
+  "13": "SDG  13.png",
+  "14": "SDG 14.png",
+  "15": "SDG 15.png",
+  "16": "SDG 16.png",
+  "17": "SDG 17.png"
+};
+
+export function findSDGAnswer(query: string): { text: string; image: string } | null {
   const qLower = query.toLowerCase().replace(/[^a-z0-9\s]/g, "");
-  
-  if (qLower.includes("how many") && qLower.includes("sustainable development goals")) return SDG_QA.find(qa => qa.q.includes("How many"))?.a || null;
-  if (qLower.includes("three pillars")) return SDG_QA.find(qa => qa.q.includes("three pillars"))?.a || null;
-  if (qLower.includes("main objective")) return SDG_QA.find(qa => qa.q.includes("main objective"))?.a || null;
-  if (qLower.match(/what are the 17\s*sustainable/)) return SDG_QA.find(qa => qa.q.includes("What are the 17"))?.a || null;
-  if (qLower.includes("when were the sdgs")) return SDG_QA.find(qa => qa.q.includes("When were"))?.a || null;
-  if (qLower.includes("2030 agenda")) return SDG_QA.find(qa => qa.q.includes("2030 Agenda"))?.a || null;
-  if (qLower.includes("meant by sustainable development")) return SDG_QA.find(qa => qa.q.includes("meant by"))?.a || null;
-  if (qLower.includes("why are sdgs important for the future")) return SDG_QA.find(qa => qa.q.includes("important for the future"))?.a || null;
-  if (qLower.includes("why are sdgs important")) return SDG_QA.find(qa => qa.q === "Why are SDGs important")?.a || null;
-  if (qLower.includes("how does technology support")) return SDG_QA.find(qa => qa.q.includes("technology support"))?.a || null;
-  if (qLower.includes("students contribute")) return SDG_QA.find(qa => qa.q.includes("students contribute"))?.a || null;
-  if (qLower.includes("engineering projects support")) return SDG_QA.find(qa => qa.q.includes("engineering projects"))?.a || null;
-  if (qLower.includes("why were the sdgs introduced")) return SDG_QA.find(qa => qa.q.includes("introduced"))?.a || null;
-  if (qLower.match(/what are (the )?sustainable development goals/)) return SDG_QA.find(qa => qa.q.startsWith("What are Sustainable"))?.a || null;
+  const defaultImage = "/SDG Photos/SDG.jpeg";
   
   const match = qLower.match(/sdg\s*(\d+)/);
   if (match) {
     const num = match[1];
     const sdgObj = SDG_QA.find(qa => qa.q === `What is SDG ${num}`);
-    if (sdgObj) return sdgObj.a;
+    if (sdgObj) {
+      const imgFileName = imageMap[num] || "SDG.jpeg";
+      return { text: sdgObj.a, image: `/SDG Photos/${imgFileName}` };
+    }
   }
+
+  let textMatch: string | null = null;
+  if (qLower.includes("how many") && qLower.includes("sustainable development goals")) textMatch = SDG_QA.find(qa => qa.q.includes("How many"))?.a || null;
+  else if (qLower.includes("three pillars")) textMatch = SDG_QA.find(qa => qa.q.includes("three pillars"))?.a || null;
+  else if (qLower.includes("main objective")) textMatch = SDG_QA.find(qa => qa.q.includes("main objective"))?.a || null;
+  else if (qLower.match(/what are the 17\s*sustainable/)) textMatch = SDG_QA.find(qa => qa.q.includes("What are the 17"))?.a || null;
+  else if (qLower.includes("when were the sdgs")) textMatch = SDG_QA.find(qa => qa.q.includes("When were"))?.a || null;
+  else if (qLower.includes("2030 agenda")) textMatch = SDG_QA.find(qa => qa.q.includes("2030 Agenda"))?.a || null;
+  else if (qLower.includes("meant by sustainable development")) textMatch = SDG_QA.find(qa => qa.q.includes("meant by"))?.a || null;
+  else if (qLower.includes("why are sdgs important for the future")) textMatch = SDG_QA.find(qa => qa.q.includes("important for the future"))?.a || null;
+  else if (qLower.includes("why are sdgs important")) textMatch = SDG_QA.find(qa => qa.q === "Why are SDGs important")?.a || null;
+  else if (qLower.includes("how does technology support")) textMatch = SDG_QA.find(qa => qa.q.includes("technology support"))?.a || null;
+  else if (qLower.includes("students contribute")) textMatch = SDG_QA.find(qa => qa.q.includes("students contribute"))?.a || null;
+  else if (qLower.includes("engineering projects support")) textMatch = SDG_QA.find(qa => qa.q.includes("engineering projects"))?.a || null;
+  else if (qLower.includes("why were the sdgs introduced")) textMatch = SDG_QA.find(qa => qa.q.includes("introduced"))?.a || null;
+  else if (qLower.match(/what are (the )?sustainable development goals/)) textMatch = SDG_QA.find(qa => qa.q.startsWith("What are Sustainable"))?.a || null;
+  
+  if (textMatch) return { text: textMatch, image: defaultImage };
   
   return null;
 }
