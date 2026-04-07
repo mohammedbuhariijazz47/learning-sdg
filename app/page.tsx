@@ -5,18 +5,16 @@ import {
   Bell,
   Bot,
   Camera,
-  Eraser,
   Globe,
   GraduationCap,
   Home as HomeIcon,
   Mic,
-  Paintbrush,
   Play,
   Settings as SettingsIcon,
   Sparkles,
   Square,
 } from "lucide-react";
-import { generateAnswer, generateDrawingFromPrompt } from "./actions";
+import { generateAnswer } from "./actions";
 
 interface SpeechRecognition extends EventTarget {
   continuous: boolean;
@@ -59,7 +57,7 @@ type SpeechRecognitionWindow = Window & {
 type Language = "en" | "ta";
 type Theme = "light" | "dark";
 type VoiceStyle = "female" | "male";
-type ActiveTab = "home" | "drawing" | "settings";
+type ActiveTab = "home" | "settings";
 
 type AnswerPayload = {
   text: string;
@@ -134,158 +132,6 @@ const InlineCamera = () => {
     </div>
   );
 };
-
-function DrawingSection({ isDark }: { isDark: boolean }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [drawing, setDrawing] = useState(false);
-  const [color, setColor] = useState("#3b82f6");
-  const [prompt, setPrompt] = useState("");
-  const [aiImage, setAiImage] = useState<string | null>(null);
-  const [aiText, setAiText] = useState("Type a prompt and tap Draw AI.");
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = rect.width * dpr;
-    canvas.height = 250 * dpr;
-    canvas.style.height = "250px";
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.scale(dpr, dpr);
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = "#3b82f6";
-  }, []);
-
-  useEffect(() => {
-    const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
-    ctx.strokeStyle = color;
-  }, [color]);
-
-  const drawAt = (clientX: number, clientY: number, move = false) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    if (!move) {
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      return;
-    }
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  };
-
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-  };
-
-  const generateDrawing = async () => {
-    const cleaned = prompt.trim();
-    if (!cleaned) return;
-    setIsGenerating(true);
-    try {
-      const data = await generateDrawingFromPrompt(cleaned);
-      setAiImage(data.image);
-      setAiText(data.text);
-    } catch (error) {
-      console.error(error);
-      setAiText("Could not generate drawing now. Try again.");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  return (
-    <section className={`overflow-hidden rounded-[2rem] border shadow-[0_12px_28px_rgba(59,130,246,0.14)] ${isDark ? "border-slate-700 bg-slate-900" : "border-pink-100 bg-gradient-to-br from-pink-50 via-yellow-50 to-cyan-50"}`}>
-      <div className="flex items-center justify-between px-5 py-4">
-        <div className="flex items-center gap-3">
-          <Paintbrush size={22} className="text-pink-500" />
-          <h2 className="text-[1.5rem] font-semibold tracking-tight md:text-2xl">Drawing AI</h2>
-        </div>
-        <div className="text-2xl">🎨 ✨</div>
-      </div>
-      <div className={`h-px ${isDark ? "bg-slate-700" : "bg-pink-200"}`} />
-      <div className="space-y-4 p-4">
-        <div className={`rounded-2xl border p-3 ${isDark ? "border-slate-700 bg-slate-950" : "border-pink-200 bg-white"}`}>
-          <div className="flex gap-2">
-            <input
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="Type prompt: red car, cute cat, rainbow house..."
-              className={`w-full rounded-xl border px-3 py-2 text-sm outline-none ${isDark ? "border-slate-700 bg-slate-900 text-slate-100" : "border-slate-200 bg-white text-slate-700"}`}
-            />
-            <button
-              onClick={generateDrawing}
-              disabled={!prompt.trim() || isGenerating}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold ${!prompt.trim() || isGenerating ? "cursor-not-allowed bg-slate-300 text-slate-500" : "bg-pink-500 text-white"}`}
-            >
-              {isGenerating ? "Drawing..." : "Draw AI"}
-            </button>
-          </div>
-          <p className={`mt-2 text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>{aiText}</p>
-        </div>
-
-        <div className={`flex min-h-[220px] items-center justify-center overflow-hidden rounded-2xl border ${isDark ? "border-slate-700 bg-slate-950" : "border-pink-200 bg-white"}`}>
-          {aiImage ? (
-            <img src={aiImage} alt="AI Drawing" className="h-full w-full object-cover" />
-          ) : (
-            <div className={`text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}>AI drawing preview appears here</div>
-          )}
-        </div>
-
-        <div className={`overflow-hidden rounded-3xl border ${isDark ? "border-slate-700 bg-slate-950" : "border-pink-200 bg-white"}`}>
-          <canvas
-            ref={canvasRef}
-            className="w-full touch-none"
-            onPointerDown={(event) => {
-              setDrawing(true);
-              drawAt(event.clientX, event.clientY, false);
-            }}
-            onPointerMove={(event) => {
-              if (!drawing) return;
-              drawAt(event.clientX, event.clientY, true);
-            }}
-            onPointerUp={() => setDrawing(false)}
-            onPointerLeave={() => setDrawing(false)}
-          />
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            {["#3b82f6", "#ec4899", "#f59e0b", "#10b981", "#8b5cf6"].map((swatch) => (
-              <button
-                key={swatch}
-                onClick={() => setColor(swatch)}
-                className={`h-8 w-8 rounded-full border-2 ${color === swatch ? "scale-110 border-slate-700" : "border-white"}`}
-                style={{ backgroundColor: swatch }}
-              />
-            ))}
-          </div>
-          <button
-            onClick={clearCanvas}
-            className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold ${isDark ? "bg-slate-800 text-slate-200" : "bg-white text-slate-700"}`}
-          >
-            <Eraser size={15} />
-            Clear
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 export default function Home() {
   const [theme, setTheme] = useState<Theme>("light");
@@ -456,9 +302,8 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="mt-4 hidden grid-cols-3 gap-2 md:grid">
+          <div className="mt-4 hidden grid-cols-2 gap-2 md:grid">
             <button onClick={() => setActiveTab("home")} className={`rounded-xl px-3 py-2 text-sm font-semibold ${activeTab === "home" ? "bg-blue-500 text-white" : isDark ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-700"}`}>Home</button>
-            <button onClick={() => setActiveTab("drawing")} className={`rounded-xl px-3 py-2 text-sm font-semibold ${activeTab === "drawing" ? "bg-pink-500 text-white" : isDark ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-700"}`}>Drawing</button>
             <button onClick={() => setActiveTab("settings")} className={`rounded-xl px-3 py-2 text-sm font-semibold ${activeTab === "settings" ? "bg-indigo-500 text-white" : isDark ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-700"}`}>Settings</button>
           </div>
         </header>
@@ -584,12 +429,6 @@ export default function Home() {
           </div>
         )}
 
-        {activeTab === "drawing" && (
-          <div className="mt-5 md:mt-7">
-            <DrawingSection isDark={isDark} />
-          </div>
-        )}
-
         {activeTab === "settings" && (
           <section className={`mt-5 overflow-hidden rounded-[2rem] border shadow-[0_12px_28px_rgba(59,130,246,0.14)] md:mt-7 ${isDark ? "border-slate-700 bg-slate-900" : "border-slate-200 bg-white"}`}>
             <div className="flex items-center gap-3 px-5 py-4">
@@ -631,9 +470,6 @@ export default function Home() {
       <nav className={`fixed bottom-4 left-1/2 flex w-[calc(100%-2rem)] max-w-[560px] -translate-x-1/2 items-center justify-around rounded-[2rem] border p-3 shadow-[0_16px_34px_rgba(15,23,42,0.16)] md:hidden ${isDark ? "border-slate-700 bg-slate-900" : "border-slate-200 bg-white"}`}>
         <button onClick={() => setActiveTab("home")} className={`flex h-12 w-12 items-center justify-center rounded-full ${activeTab === "home" ? "bg-blue-500 text-white" : isDark ? "text-slate-300" : "text-slate-500"}`}>
           <HomeIcon size={22} />
-        </button>
-        <button onClick={() => setActiveTab("drawing")} className={`flex h-12 w-12 items-center justify-center rounded-full ${activeTab === "drawing" ? "bg-pink-500 text-white" : isDark ? "text-slate-300" : "text-slate-500"}`}>
-          <Paintbrush size={22} />
         </button>
         <button onClick={() => setActiveTab("settings")} className={`flex h-12 w-12 items-center justify-center rounded-full ${activeTab === "settings" ? "bg-indigo-500 text-white" : isDark ? "text-slate-300" : "text-slate-500"}`}>
           <SettingsIcon size={22} />
