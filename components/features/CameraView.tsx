@@ -8,13 +8,15 @@ export const CameraView = () => {
     const [hasPermission, setHasPermission] = useState<boolean | null>(null);
 
     useEffect(() => {
+        const currentVideo = videoRef.current;
+
         const startCamera = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment' }
                 });
-                if (videoRef.current) {
-                    videoRef.current.srcObject = stream;
+                if (currentVideo) {
+                    currentVideo.srcObject = stream;
                     setHasPermission(true);
                 }
             } catch (err) {
@@ -26,9 +28,8 @@ export const CameraView = () => {
         startCamera();
 
         return () => {
-            // Cleanup: stop tracks
-            if (videoRef.current && videoRef.current.srcObject) {
-                const stream = videoRef.current.srcObject as MediaStream;
+            if (currentVideo && currentVideo.srcObject) {
+                const stream = currentVideo.srcObject as MediaStream;
                 stream.getTracks().forEach(track => track.stop());
             }
         };

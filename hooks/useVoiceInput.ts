@@ -1,27 +1,57 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-// Define the SpeechRecognition types as they might not be in the default Typescript lib
-interface IWindow extends Window {
-    webkitSpeechRecognition: any;
-    SpeechRecognition: any;
+interface BrowserSpeechRecognition extends EventTarget {
+    continuous: boolean;
+    interimResults: boolean;
+    lang: string;
+    start(): void;
+    stop(): void;
+    onstart: (() => void) | null;
+    onresult: ((event: BrowserSpeechRecognitionEvent) => void) | null;
+    onerror: ((event: BrowserSpeechRecognitionErrorEvent) => void) | null;
+    onend: (() => void) | null;
+}
+
+interface BrowserSpeechRecognitionEvent {
+    resultIndex: number;
+    results: {
+        [index: number]: {
+            [index: number]: {
+                transcript: string;
+            };
+        };
+    };
+}
+
+interface BrowserSpeechRecognitionErrorEvent {
+    error: string;
+}
+
+interface SpeechRecognitionWindow extends Window {
+    webkitSpeechRecognition?: {
+        new (): BrowserSpeechRecognition;
+    };
+    SpeechRecognition?: {
+        new (): BrowserSpeechRecognition;
+    };
 }
 
 export const useVoiceInput = () => {
     const [isListening, setIsListening] = useState(false);
     const [transcript, setTranscript] = useState('');
     const [error, setError] = useState<string | null>(null);
-    const recognitionRef = useRef<any>(null);
+    const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
+
+    const Recognition = useMemo(() => {
+        if (typeof window === 'undefined') return null;
+        const speechWindow = window as SpeechRecognitionWindow;
+        return speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition || null;
+    }, []);
 
     useEffect(() => {
-        const { webkitSpeechRecognition, SpeechRecognition } = window as unknown as IWindow;
-        if (!webkitSpeechRecognition && !SpeechRecognition) {
-            setError("Your browser doesn't support speech recognition.");
-            return;
-        }
+        if (!Recognition) return;
 
-        const Recognition = SpeechRecognition || webkitSpeechRecognition;
         const recognition = new Recognition();
-
         recognition.continuous = false;
         recognition.interimResults = false;
         recognition.lang = 'en-US';
@@ -31,13 +61,13 @@ export const useVoiceInput = () => {
             setError(null);
         };
 
-        recognition.onresult = (event: any) => {
+        recognition.onresult = (event) => {
             const current = event.resultIndex;
             const text = event.results[current][0].transcript;
             setTranscript(text);
         };
 
-        recognition.onerror = (event: any) => {
+        recognition.onerror = (event) => {
             console.error(event.error);
             setError(`Error: ${event.error}`);
             setIsListening(false);
@@ -48,23 +78,30 @@ export const useVoiceInput = () => {
         };
 
         recognitionRef.current = recognition;
-    }, []);
+
+        return () => {
+            recognition.stop();
+            recognitionRef.current = null;
+        };
+    }, [Recognition]);
 
     const startListening = useCallback(() => {
+        if (!Recognition) {
+            setError("Your browser doesn't support speech recognition.");
+            return;
+        }
+
         if (recognitionRef.current) {
             try {
                 recognitionRef.current.start();
-            } catch (e) {
-                // Sometimes start is called when already started
-                console.error(e);
+            } catch (eventError) {
+                console.error(eventError);
             }
         }
-    }, []);
+    }, [Recognition]);
 
     const stopListening = useCallback(() => {
-        if (recognitionRef.current) {
-            recognitionRef.current.stop();
-        }
+        recognitionRef.current?.stop();
     }, []);
 
     const resetTranscript = useCallback(() => {

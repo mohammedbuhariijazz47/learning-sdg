@@ -1,16 +1,20 @@
 'use client';
 
+import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bell,
   Bot,
   Camera,
+  Eye,
+  EyeOff,
   Globe,
   GraduationCap,
   Home as HomeIcon,
   Mic,
   Play,
   Settings as SettingsIcon,
+  SlidersHorizontal,
   Sparkles,
   Square,
 } from "lucide-react";
@@ -54,8 +58,7 @@ type SpeechRecognitionWindow = Window & {
   SpeechRecognition?: { new (): SpeechRecognition };
 };
 
-type Language = "en" | "ta";
-type Theme = "light" | "dark";
+type Theme = "sunrise" | "night";
 type VoiceStyle = "female" | "male";
 type ActiveTab = "home" | "settings";
 
@@ -66,12 +69,16 @@ type AnswerPayload = {
 
 const STORAGE_KEYS = {
   theme: "kids_theme",
-  language: "kids_language",
   voiceStyle: "kids_voice_style",
   speechRate: "kids_speech_rate",
+  cameraEnabled: "kids_camera_enabled",
 };
 
-const useSpeechRecognition = (onResult: (text: string) => void, lang: Language) => {
+const MIN_RATE = 0.8;
+const MAX_RATE = 2;
+const QUICK_RATES = [1, 1.5, 2];
+
+const useSpeechRecognition = (onResult: (text: string) => void) => {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -84,14 +91,14 @@ const useSpeechRecognition = (onResult: (text: string) => void, lang: Language) 
     recognitionRef.current = new SpeechRecognitionCtor();
     recognitionRef.current.continuous = false;
     recognitionRef.current.interimResults = false;
-    recognitionRef.current.lang = lang === "ta" ? "ta-IN" : "en-US";
+    recognitionRef.current.lang = "en-US";
 
     recognitionRef.current.onstart = () => setIsListening(true);
     recognitionRef.current.onend = () => setIsListening(false);
     recognitionRef.current.onresult = (event: SpeechRecognitionEvent) => {
       onResult(event.results[0][0].transcript);
     };
-  }, [onResult, lang]);
+  }, [onResult]);
 
   const startListening = () => {
     try {
@@ -106,38 +113,117 @@ const useSpeechRecognition = (onResult: (text: string) => void, lang: Language) 
   return { isListening, startListening, stopListening };
 };
 
-const InlineCamera = () => {
+type InlineCameraProps = {
+  isDark: boolean;
+  enabled: boolean;
+  onToggle: () => void;
+};
+
+const InlineCamera = ({ isDark, enabled, onToggle }: InlineCameraProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [cameraState, setCameraState] = useState<"loading" | "ready" | "blocked">(enabled ? "loading" : "ready");
 
   useEffect(() => {
-    const currentVideo = videoRef.current;
+    const stopStream = () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+    };
+
+    if (!enabled) {
+      stopStream();
+      return stopStream;
+    }
+
+    let ignore = false;
+
     const startCamera = async () => {
+      setCameraState("loading");
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-        if (currentVideo) currentVideo.srcObject = stream;
+        if (ignore) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) videoRef.current.srcObject = stream;
+        setCameraState("ready");
       } catch (error) {
         console.error("Camera Error:", error);
+        stopStream();
+        setCameraState("blocked");
       }
     };
+
     startCamera();
+
     return () => {
-      const stream = currentVideo?.srcObject as MediaStream;
-      stream?.getTracks().forEach((track) => track.stop());
+      ignore = true;
+      stopStream();
     };
-  }, []);
+  }, [enabled]);
 
   return (
-    <div className="relative h-full w-full bg-black">
-      <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover [transform:scaleX(-1)]" />
+    <div className={`relative h-full w-full overflow-hidden ${isDark ? "bg-slate-950" : "bg-[#d9ecff]"}`}>
+      {enabled && cameraState !== "blocked" && (
+        <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover [transform:scaleX(-1)]" />
+      )}
+
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`absolute right-3 top-3 z-10 inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-semibold shadow-lg backdrop-blur md:right-4 md:top-4 ${
+          enabled
+            ? "bg-black/65 text-white"
+            : isDark
+              ? "bg-slate-800/90 text-slate-100"
+              : "bg-white/90 text-slate-700"
+        }`}
+      >
+        {enabled ? <EyeOff size={14} /> : <Eye size={14} />}
+        {enabled ? "Camera Off" : "Camera On"}
+      </button>
+
+      {cameraState === "loading" && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/35 text-white">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/25 border-t-white" />
+          <p className="text-sm font-medium">Starting camera...</p>
+        </div>
+      )}
+
+      {!enabled && (
+        <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center ${isDark ? "text-slate-300" : "text-slate-700"}`}>
+          <div className={`flex h-16 w-16 items-center justify-center rounded-3xl ${isDark ? "bg-slate-800 text-slate-200" : "bg-white/80 text-sky-700"}`}>
+            <Camera size={28} />
+          </div>
+          <div>
+            <p className="text-base font-semibold">Camera is off</p>
+            <p className={`mt-1 text-sm ${isDark ? "text-slate-400" : "text-slate-600"}`}>Turn it on anytime from the corner button.</p>
+          </div>
+        </div>
+      )}
+
+      {cameraState === "blocked" && (
+        <div className={`absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center ${isDark ? "bg-slate-950 text-slate-200" : "bg-[#f8fbff] text-slate-700"}`}>
+          <div className={`flex h-16 w-16 items-center justify-center rounded-3xl ${isDark ? "bg-slate-800 text-slate-200" : "bg-sky-100 text-sky-700"}`}>
+            <Camera size={28} />
+          </div>
+          <div>
+            <p className="text-base font-semibold">Camera access unavailable</p>
+            <p className={`mt-1 text-sm ${isDark ? "text-slate-400" : "text-slate-600"}`}>Allow camera permission, then use the corner button to try again.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default function Home() {
-  const [theme, setTheme] = useState<Theme>("light");
-  const [language, setLanguage] = useState<Language>("en");
+  const [theme, setTheme] = useState<Theme>("sunrise");
   const [voiceStyle, setVoiceStyle] = useState<VoiceStyle>("female");
-  const [speechRate, setSpeechRate] = useState(1);
+  const [speechRate, setSpeechRate] = useState(1.2);
+  const [cameraEnabled, setCameraEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState<ActiveTab>("home");
   const [query, setQuery] = useState("");
   const [typedQuestion, setTypedQuestion] = useState("");
@@ -148,27 +234,27 @@ export default function Home() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const savedTheme = window.localStorage.getItem(STORAGE_KEYS.theme) as Theme | null;
-    const savedLang = window.localStorage.getItem(STORAGE_KEYS.language) as Language | null;
     const savedVoice = window.localStorage.getItem(STORAGE_KEYS.voiceStyle) as VoiceStyle | null;
     const savedRate = window.localStorage.getItem(STORAGE_KEYS.speechRate);
-    if (savedTheme === "dark" || savedTheme === "light") setTheme(savedTheme);
-    if (savedLang === "en" || savedLang === "ta") setLanguage(savedLang);
+    const savedCameraEnabled = window.localStorage.getItem(STORAGE_KEYS.cameraEnabled);
+
+    if (savedTheme === "sunrise" || savedTheme === "night") setTheme(savedTheme);
     if (savedVoice === "female" || savedVoice === "male") setVoiceStyle(savedVoice);
     if (savedRate) {
       const rate = Number(savedRate);
-      if (!Number.isNaN(rate) && rate >= 0.6 && rate <= 1.4) setSpeechRate(rate);
+      if (!Number.isNaN(rate) && rate >= MIN_RATE && rate <= MAX_RATE) setSpeechRate(rate);
     }
+    if (savedCameraEnabled === "true" || savedCameraEnabled === "false") {
+      setCameraEnabled(savedCameraEnabled === "true");
+    }
+
+    window.localStorage.removeItem("kids_language");
   }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(STORAGE_KEYS.theme, theme);
   }, [theme]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(STORAGE_KEYS.language, language);
-  }, [language]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -180,27 +266,55 @@ export default function Home() {
     window.localStorage.setItem(STORAGE_KEYS.speechRate, String(speechRate));
   }, [speechRate]);
 
-  const labels = useMemo(() => {
-    if (language === "ta") {
-      return {
-        askQuestion: "Kelvi Kelungal",
-        voiceCamera: "Voice + Camera",
-        speakQuestion: "Kelvi Pesungal",
-        stopListening: "Niruthu",
-        typeQuestion: "Ungal kelviyai type seiyungal...",
-        ask: "Kel",
-        lastQuestion: "Last question",
-        answerVisual: "AI Bathil & Visual",
-        ready: "Ready",
-        thinking: "Yosikirathu...",
-        answerPlaceholder: "Kelvi ketta pin bathil inge varum.",
-        playAnswer: "AI Bathil Play",
-        stopAnswer: "Stop",
-      };
-    }
-    return {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(STORAGE_KEYS.cameraEnabled, String(cameraEnabled));
+  }, [cameraEnabled]);
+
+  const isDark = theme === "night";
+
+  const palette = useMemo(
+    () =>
+      isDark
+        ? {
+            page: "bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_32%),linear-gradient(180deg,#020617_0%,#0f172a_45%,#111827_100%)] text-slate-100",
+            card: "border-slate-700/80 bg-slate-900/80",
+            softCard: "border-slate-700/70 bg-slate-900/60",
+            muted: "text-slate-400",
+            heading: "text-slate-50",
+            subheading: "text-slate-300",
+            pill: "bg-cyan-500/15 text-cyan-200 border border-cyan-400/25",
+            accent: "from-cyan-400 to-blue-500",
+            accentSolid: "bg-cyan-500 text-slate-950",
+            secondaryButton: "bg-slate-800 text-slate-200",
+            input: "border-slate-700 bg-slate-950/80 text-slate-100 placeholder:text-slate-500",
+            answerPanel: "border-slate-700 bg-slate-950/85 text-slate-200",
+            visualPanel: "border-slate-700 bg-slate-950",
+            nav: "border-slate-700 bg-slate-900/90",
+          }
+        : {
+            page: "bg-[radial-gradient(circle_at_top,_rgba(125,211,252,0.45),_transparent_30%),linear-gradient(180deg,#f7fcff_0%,#eef8ff_55%,#fff6e8_100%)] text-slate-900",
+            card: "border-white/70 bg-white/85",
+            softCard: "border-sky-100 bg-white/75",
+            muted: "text-slate-600",
+            heading: "text-slate-900",
+            subheading: "text-slate-700",
+            pill: "bg-sky-100 text-sky-700 border border-sky-200",
+            accent: "from-sky-500 via-cyan-500 to-emerald-400",
+            accentSolid: "bg-sky-500 text-white",
+            secondaryButton: "bg-sky-50 text-slate-700",
+            input: "border-sky-100 bg-white text-slate-700 placeholder:text-slate-400",
+            answerPanel: "border-sky-100 bg-white text-slate-800",
+            visualPanel: "border-sky-100 bg-[#f8fbff]",
+            nav: "border-white/80 bg-white/90",
+          },
+    [isDark]
+  );
+
+  const labels = useMemo(
+    () => ({
       askQuestion: "Ask Your Question",
-      voiceCamera: "VOICE + CAMERA",
+      voiceCamera: "Voice + Camera",
       speakQuestion: "Speak Question",
       stopListening: "Stop Listening",
       typeQuestion: "Type your question...",
@@ -212,8 +326,9 @@ export default function Home() {
       answerPlaceholder: "Answer will appear here after you ask a question.",
       playAnswer: "Play AI Answer",
       stopAnswer: "Stop AI Answer",
-    };
-  }, [language]);
+    }),
+    []
+  );
 
   const onSpeechResult = (text: string) => {
     setQuery(text);
@@ -221,13 +336,12 @@ export default function Home() {
     processInput(text);
   };
 
-  const { isListening, startListening, stopListening } = useSpeechRecognition(onSpeechResult, language);
+  const { isListening, startListening, stopListening } = useSpeechRecognition(onSpeechResult);
 
   const pickVoice = (voices: SpeechSynthesisVoice[]) => {
-    const langPrefix = language === "ta" ? "ta" : "en";
-    const langVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith(langPrefix));
-    const pool = langVoices.length > 0 ? langVoices : voices;
-    const hints = voiceStyle === "female" ? ["female", "zira", "samantha", "veena"] : ["male", "david", "alex", "mark"];
+    const englishVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith("en"));
+    const pool = englishVoices.length > 0 ? englishVoices : voices;
+    const hints = voiceStyle === "female" ? ["female", "zira", "samantha", "aria"] : ["male", "david", "alex", "mark"];
     const picked = pool.find((voice) => hints.some((hint) => voice.name.toLowerCase().includes(hint)));
     return picked ?? pool[0] ?? null;
   };
@@ -236,9 +350,9 @@ export default function Home() {
     if (typeof window === "undefined") return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = language === "ta" ? "ta-IN" : "en-US";
+    utterance.lang = "en-US";
     utterance.rate = speechRate;
-    utterance.pitch = voiceStyle === "female" ? 1.1 : 0.95;
+    utterance.pitch = voiceStyle === "female" ? 1.08 : 0.96;
     const voice = pickVoice(window.speechSynthesis.getVoices());
     if (voice) utterance.voice = voice;
     utterance.onstart = () => setAiSpeaking(true);
@@ -252,7 +366,7 @@ export default function Home() {
     setIsLoading(true);
     if (typeof window !== "undefined") window.speechSynthesis.cancel();
     try {
-      const data = await generateAnswer(cleaned, language);
+      const data = await generateAnswer(cleaned, "en");
       setResult(data);
       speak(data.text);
     } catch (error) {
@@ -264,6 +378,7 @@ export default function Home() {
   };
 
   const toggleSpeech = () => {
+    if (typeof window === "undefined") return;
     if (aiSpeaking) {
       window.speechSynthesis.cancel();
       setAiSpeaking(false);
@@ -280,58 +395,70 @@ export default function Home() {
     setTypedQuestion("");
   };
 
-  const isDark = theme === "dark";
-
   return (
-    <main className={`min-h-screen px-4 pb-28 pt-5 md:px-8 md:pb-10 md:pt-8 ${isDark ? "bg-slate-950 text-slate-100" : "bg-[#eef2f7] text-slate-900"}`}>
-      <div className="mx-auto w-full max-w-[560px] md:max-w-[1080px]">
-        <header className={`rounded-[2rem] border px-4 py-4 shadow-[0_10px_25px_rgba(15,23,42,0.08)] md:px-7 md:py-5 ${isDark ? "border-slate-700 bg-slate-900" : "border-slate-200 bg-white"}`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg md:h-16 md:w-16">
+    <main className={`min-h-screen px-4 pb-28 pt-5 md:px-8 md:pb-10 md:pt-8 ${palette.page}`}>
+      <div className="mx-auto w-full max-w-[560px] md:max-w-[1120px]">
+        <header className={`rounded-[2rem] border px-4 py-4 shadow-[0_22px_60px_rgba(15,23,42,0.12)] backdrop-blur md:px-7 md:py-6 ${palette.card}`}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 md:gap-4">
+              <div className={`flex h-14 w-14 items-center justify-center rounded-[1.5rem] bg-gradient-to-br ${palette.accent} text-white shadow-lg md:h-16 md:w-16`}>
                 <GraduationCap size={26} />
               </div>
               <div>
-                <h1 className={`text-[2rem] font-semibold leading-none tracking-tight md:text-4xl ${isDark ? "text-slate-100" : "text-slate-900"}`}>Mohammed Buhari Ijaz</h1>
-                <p className={`mt-1 text-base font-medium md:text-xl ${isDark ? "text-slate-300" : "text-slate-600"}`}>Second Year - Department of EEE</p>
-                <p className="mt-1 text-xs uppercase tracking-wide text-slate-400 md:text-base">DR MGR EDUCATIONAL AND RESEARCH INSTITUTE</p>
+                <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${palette.pill}`}>
+                  <Sparkles size={14} />
+                  Friendly AI Learning Assistant
+                </div>
+                <h1 className={`mt-3 text-[1.8rem] font-semibold leading-none tracking-tight md:text-4xl ${palette.heading}`}>Mohammed Buhari Ijaz</h1>
+                <p className={`mt-2 text-sm font-medium md:text-xl ${palette.subheading}`}>Second Year - Department of EEE</p>
+                <p className={`mt-1 text-xs uppercase tracking-[0.18em] md:text-sm ${palette.muted}`}>DR MGR Educational and Research Institute</p>
               </div>
             </div>
-            <button className={`flex h-12 w-12 items-center justify-center rounded-full md:h-14 md:w-14 ${isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-500"}`}>
+            <button className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full shadow-sm md:h-14 md:w-14 ${palette.secondaryButton}`}>
               <Bell size={18} />
             </button>
           </div>
 
-          <div className="mt-4 hidden grid-cols-2 gap-2 md:grid">
-            <button onClick={() => setActiveTab("home")} className={`rounded-xl px-3 py-2 text-sm font-semibold ${activeTab === "home" ? "bg-blue-500 text-white" : isDark ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-700"}`}>Home</button>
-            <button onClick={() => setActiveTab("settings")} className={`rounded-xl px-3 py-2 text-sm font-semibold ${activeTab === "settings" ? "bg-indigo-500 text-white" : isDark ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-700"}`}>Settings</button>
+          <div className="mt-5 hidden grid-cols-2 gap-3 md:grid">
+            <button
+              onClick={() => setActiveTab("home")}
+              className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${activeTab === "home" ? `${palette.accentSolid} shadow-lg` : palette.secondaryButton}`}
+            >
+              Home
+            </button>
+            <button
+              onClick={() => setActiveTab("settings")}
+              className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${activeTab === "settings" ? `${palette.accentSolid} shadow-lg` : palette.secondaryButton}`}
+            >
+              Settings
+            </button>
           </div>
         </header>
 
         {activeTab === "home" && (
           <div className="mt-5 grid grid-cols-1 gap-5 md:mt-7 md:grid-cols-2 md:items-start md:gap-6">
-            <section className={`overflow-hidden rounded-[2rem] border shadow-[0_10px_24px_rgba(15,23,42,0.08)] ${isDark ? "border-slate-700 bg-slate-900" : "border-slate-200 bg-white"}`}>
+            <section className={`overflow-hidden rounded-[2rem] border shadow-[0_18px_48px_rgba(14,165,233,0.12)] backdrop-blur ${palette.card}`}>
               <div className="flex items-center justify-between px-5 py-4">
                 <div className="flex items-center gap-3">
-                  <Camera size={22} className="text-blue-500" />
-                  <h2 className="text-[1.5rem] font-semibold tracking-tight md:text-2xl">{labels.askQuestion}</h2>
+                  <Camera size={22} className="text-sky-500" />
+                  <h2 className="text-[1.4rem] font-semibold tracking-tight md:text-2xl">{labels.askQuestion}</h2>
                 </div>
-                <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 md:text-sm">{labels.voiceCamera}</span>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold md:text-sm ${palette.pill}`}>{labels.voiceCamera}</span>
               </div>
-              <div className={`h-px ${isDark ? "bg-slate-700" : "bg-slate-200"}`} />
+              <div className={`h-px ${isDark ? "bg-slate-700/80" : "bg-sky-100"}`} />
 
               <div className="p-4">
-                <div className="relative aspect-[4/3] overflow-hidden rounded-[1.6rem] bg-slate-100">
-                  <InlineCamera />
-                  <div className="absolute right-3 top-3 flex items-center gap-2 rounded-full bg-slate-500/80 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-white md:right-4 md:top-4 md:text-sm">
-                    <span className={`h-2.5 w-2.5 rounded-full ${isListening ? "bg-rose-500 animate-pulse" : "bg-emerald-400"}`} />
-                    {isListening ? "Live" : labels.ready}
+                <div className={`relative aspect-[4/3] overflow-hidden rounded-[1.75rem] border ${isDark ? "border-slate-700 bg-slate-950" : "border-sky-100 bg-white"}`}>
+                  <InlineCamera isDark={isDark} enabled={cameraEnabled} onToggle={() => setCameraEnabled((current) => !current)} />
+                  <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-slate-900/65 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-white md:left-4 md:top-4 md:text-sm">
+                    <span className={`h-2.5 w-2.5 rounded-full ${isListening ? "animate-pulse bg-rose-500" : cameraEnabled ? "bg-emerald-400" : "bg-amber-400"}`} />
+                    {isListening ? "Listening" : cameraEnabled ? "Live" : "Camera Off"}
                   </div>
 
                   <button
                     onClick={isListening ? stopListening : startListening}
-                    className={`absolute bottom-4 left-1/2 flex w-[74%] min-w-[220px] -translate-x-1/2 items-center justify-center gap-2 rounded-full px-6 py-3 text-base font-semibold text-white shadow-lg transition-transform active:scale-95 md:bottom-5 md:w-auto md:min-w-0 md:px-7 md:text-lg ${
-                      isListening ? "bg-gradient-to-r from-rose-500 to-red-500" : "bg-gradient-to-r from-blue-500 to-blue-600"
+                    className={`absolute bottom-4 left-1/2 flex w-[78%] min-w-[220px] -translate-x-1/2 items-center justify-center gap-2 rounded-full px-6 py-3 text-base font-semibold text-white shadow-xl transition-transform active:scale-95 md:bottom-5 md:w-auto md:min-w-0 md:px-7 md:text-lg ${
+                      isListening ? "bg-gradient-to-r from-rose-500 to-red-500" : `bg-gradient-to-r ${palette.accent}`
                     }`}
                   >
                     {isListening ? <Square size={18} fill="currentColor" /> : <Mic size={20} />}
@@ -339,7 +466,15 @@ export default function Home() {
                   </button>
                 </div>
 
-                <div className={`mt-4 space-y-3 rounded-3xl border px-4 py-4 ${isDark ? "border-slate-700 bg-slate-800/80" : "border-slate-200 bg-slate-100/90"}`}>
+                <div className={`mt-4 space-y-3 rounded-[1.75rem] border px-4 py-4 ${palette.softCard}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className={`text-sm font-semibold ${palette.heading}`}>Type or talk naturally</p>
+                      <p className={`text-sm ${palette.muted}`}>Short questions work best for faster answers.</p>
+                    </div>
+                    <div className={`rounded-full px-3 py-1 text-xs font-semibold ${palette.pill}`}>English only</div>
+                  </div>
+
                   <textarea
                     value={typedQuestion}
                     onChange={(event) => setTypedQuestion(event.target.value)}
@@ -350,16 +485,18 @@ export default function Home() {
                       }
                     }}
                     placeholder={labels.typeQuestion}
-                    className={`min-h-[84px] w-full resize-none rounded-2xl border px-4 py-3 text-base outline-none ring-blue-500/40 placeholder:text-slate-400 focus:ring-2 ${isDark ? "border-slate-600 bg-slate-900 text-slate-100" : "border-slate-200 bg-white text-slate-700"}`}
+                    className={`min-h-[96px] w-full resize-none rounded-[1.35rem] border px-4 py-3 text-base outline-none ring-sky-500/30 focus:ring-4 ${palette.input}`}
                   />
                   <div className="flex items-center justify-between gap-3">
-                    <p className={`truncate text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                      {query ? `${labels.lastQuestion}: ${query}` : "You can type or use voice."}
+                    <p className={`truncate text-sm ${palette.muted}`}>
+                      {query ? `${labels.lastQuestion}: ${query}` : "You can ask by typing or using your microphone."}
                     </p>
                     <button
                       onClick={submitTypedQuestion}
                       disabled={!typedQuestion.trim() || isLoading}
-                      className={`rounded-full px-4 py-2 text-sm font-semibold ${!typedQuestion.trim() || isLoading ? "cursor-not-allowed bg-slate-300 text-slate-500" : "bg-blue-500 text-white"}`}
+                      className={`rounded-full px-5 py-2.5 text-sm font-semibold shadow-sm transition ${
+                        !typedQuestion.trim() || isLoading ? "cursor-not-allowed bg-slate-300 text-slate-500" : `${palette.accentSolid}`
+                      }`}
                     >
                       {labels.ask}
                     </button>
@@ -368,57 +505,63 @@ export default function Home() {
               </div>
             </section>
 
-            <section className={`overflow-hidden rounded-[2rem] border shadow-[0_12px_28px_rgba(59,130,246,0.14)] ${isDark ? "border-slate-700 bg-slate-900" : "border-blue-100 bg-[#eaf1fb]"}`}>
+            <section className={`overflow-hidden rounded-[2rem] border shadow-[0_18px_48px_rgba(14,165,233,0.12)] backdrop-blur ${palette.card}`}>
               <div className="flex items-center justify-between px-5 py-4">
                 <div className="flex items-center gap-3">
-                  <Sparkles size={22} className="text-blue-500" />
-                  <h2 className="text-[1.5rem] font-semibold tracking-tight md:text-2xl">{labels.answerVisual}</h2>
+                  <Sparkles size={22} className="text-sky-500" />
+                  <h2 className="text-[1.4rem] font-semibold tracking-tight md:text-2xl">{labels.answerVisual}</h2>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-slate-600 md:text-base">
+                <div className={`flex items-center gap-2 text-sm md:text-base ${palette.muted}`}>
                   <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
                   {labels.ready}
                 </div>
               </div>
-              <div className={`h-px ${isDark ? "bg-slate-700" : "bg-blue-100"}`} />
+              <div className={`h-px ${isDark ? "bg-slate-700/80" : "bg-sky-100"}`} />
 
               <div className="space-y-4 p-4">
-                <div className={`flex min-h-[240px] items-center justify-center rounded-[1.6rem] border p-4 ${isDark ? "border-slate-700 bg-slate-950" : "border-slate-200 bg-white"}`}>
+                <div className={`flex min-h-[240px] items-center justify-center rounded-[1.75rem] border p-4 ${palette.visualPanel}`}>
                   {isLoading ? (
                     <div className="flex flex-col items-center gap-3">
                       <div className="relative">
-                        <div className="h-14 w-14 animate-spin rounded-full border-4 border-blue-200 border-t-blue-500" />
+                        <div className="h-14 w-14 animate-spin rounded-full border-4 border-sky-200 border-t-sky-500" />
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <Sparkles size={15} className="text-blue-500" />
+                          <Sparkles size={15} className="text-sky-500" />
                         </div>
                       </div>
-                      <span className="text-sm font-semibold text-blue-500">{labels.thinking}</span>
+                      <span className="text-sm font-semibold text-sky-500">{labels.thinking}</span>
                     </div>
                   ) : result?.image ? (
-                    <img src={result.image} alt="Visual Answer" className="max-h-[220px] rounded-2xl object-contain" />
+                    <Image src={result.image} alt="Visual Answer" width={420} height={220} className="max-h-[220px] w-auto rounded-[1.35rem] object-contain" />
                   ) : (
-                    <div className={`flex flex-col items-center gap-2 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                      <div className={`rounded-2xl border border-dashed px-8 py-8 ${isDark ? "border-slate-700 bg-slate-900" : "border-slate-300 bg-slate-50"}`}>
+                    <div className={`flex flex-col items-center gap-2 ${palette.muted}`}>
+                      <div className={`rounded-[1.35rem] border border-dashed px-8 py-8 ${isDark ? "border-slate-700 bg-slate-900" : "border-sky-200 bg-white"}`}>
                         <Globe size={18} />
                       </div>
-                      <span className="text-sm">Visual context area</span>
+                      <span className="text-sm">Visual answer area</span>
                     </div>
                   )}
                 </div>
 
-                <div className={`custom-scrollbar max-h-[220px] overflow-y-auto rounded-3xl border px-5 py-4 text-base leading-relaxed md:text-[1.1rem] ${isDark ? "border-slate-700 bg-slate-950 text-slate-200" : "border-slate-200 bg-white text-slate-800"}`}>
+                <div className={`custom-scrollbar max-h-[220px] overflow-y-auto rounded-[1.75rem] border px-5 py-4 text-base leading-relaxed md:text-[1.05rem] ${palette.answerPanel}`}>
                   <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-500">
+                    <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-600">
                       <Bot size={18} />
                     </div>
-                    {result?.text ? <div className="whitespace-pre-wrap font-sans">{result.text}</div> : <p className={`italic ${isDark ? "text-slate-500" : "text-slate-400"}`}>{labels.answerPlaceholder}</p>}
+                    {result?.text ? <div className="whitespace-pre-wrap">{result.text}</div> : <p className={`italic ${palette.muted}`}>{labels.answerPlaceholder}</p>}
                   </div>
                 </div>
 
                 <button
                   onClick={toggleSpeech}
                   disabled={!result}
-                  className={`flex w-full items-center justify-center gap-2 rounded-3xl border px-5 py-4 text-lg font-semibold transition active:scale-[0.99] md:text-xl ${
-                    !result ? "cursor-not-allowed border-slate-600 bg-slate-800 text-slate-500" : aiSpeaking ? "border-orange-400 bg-orange-50 text-orange-600" : isDark ? "border-blue-500 bg-slate-950 text-blue-400" : "border-blue-500 bg-white text-blue-600"
+                  className={`flex w-full items-center justify-center gap-2 rounded-[1.5rem] border px-5 py-4 text-lg font-semibold transition active:scale-[0.99] md:text-xl ${
+                    !result
+                      ? "cursor-not-allowed border-slate-300 bg-slate-200 text-slate-500"
+                      : aiSpeaking
+                        ? "border-orange-300 bg-orange-50 text-orange-600"
+                        : isDark
+                          ? "border-cyan-400/40 bg-slate-950 text-cyan-300"
+                          : "border-sky-200 bg-white text-sky-600"
                   }`}
                 >
                   {aiSpeaking ? <Square size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
@@ -430,48 +573,116 @@ export default function Home() {
         )}
 
         {activeTab === "settings" && (
-          <section className={`mt-5 overflow-hidden rounded-[2rem] border shadow-[0_12px_28px_rgba(59,130,246,0.14)] md:mt-7 ${isDark ? "border-slate-700 bg-slate-900" : "border-slate-200 bg-white"}`}>
+          <section className={`mt-5 overflow-hidden rounded-[2rem] border shadow-[0_18px_48px_rgba(14,165,233,0.12)] backdrop-blur md:mt-7 ${palette.card}`}>
             <div className="flex items-center gap-3 px-5 py-4">
-              <SettingsIcon size={22} className="text-indigo-500" />
-              <h2 className="text-[1.5rem] font-semibold tracking-tight md:text-2xl">Settings</h2>
+              <SettingsIcon size={22} className="text-sky-500" />
+              <h2 className="text-[1.4rem] font-semibold tracking-tight md:text-2xl">Settings</h2>
             </div>
-            <div className={`h-px ${isDark ? "bg-slate-700" : "bg-slate-200"}`} />
-            <div className="space-y-4 p-4">
-              <div>
-                <p className="mb-2 text-sm font-semibold text-slate-400">Theme</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => setTheme("light")} className={`rounded-xl px-3 py-2 text-sm font-semibold ${theme === "light" ? "bg-blue-500 text-white" : isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-700"}`}>Light</button>
-                  <button onClick={() => setTheme("dark")} className={`rounded-xl px-3 py-2 text-sm font-semibold ${theme === "dark" ? "bg-blue-500 text-white" : isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-700"}`}>Dark</button>
+            <div className={`h-px ${isDark ? "bg-slate-700/80" : "bg-sky-100"}`} />
+            <div className="space-y-5 p-4">
+              <div className={`rounded-[1.6rem] border p-4 ${palette.softCard}`}>
+                <p className={`mb-3 text-sm font-semibold ${palette.muted}`}>Theme</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setTheme("sunrise")}
+                    className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${theme === "sunrise" ? `${palette.accentSolid} shadow-lg` : palette.secondaryButton}`}
+                  >
+                    Sunrise
+                  </button>
+                  <button
+                    onClick={() => setTheme("night")}
+                    className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${theme === "night" ? `${palette.accentSolid} shadow-lg` : palette.secondaryButton}`}
+                  >
+                    Night
+                  </button>
                 </div>
               </div>
-              <div>
-                <p className="mb-2 text-sm font-semibold text-slate-400">Language</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => setLanguage("en")} className={`rounded-xl px-3 py-2 text-sm font-semibold ${language === "en" ? "bg-blue-500 text-white" : isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-700"}`}>English</button>
-                  <button onClick={() => setLanguage("ta")} className={`rounded-xl px-3 py-2 text-sm font-semibold ${language === "ta" ? "bg-blue-500 text-white" : isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-700"}`}>Tamil</button>
+
+              <div className={`rounded-[1.6rem] border p-4 ${palette.softCard}`}>
+                <p className={`mb-3 text-sm font-semibold ${palette.muted}`}>Voice style</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setVoiceStyle("female")}
+                    className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${voiceStyle === "female" ? `${palette.accentSolid} shadow-lg` : palette.secondaryButton}`}
+                  >
+                    Female
+                  </button>
+                  <button
+                    onClick={() => setVoiceStyle("male")}
+                    className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${voiceStyle === "male" ? `${palette.accentSolid} shadow-lg` : palette.secondaryButton}`}
+                  >
+                    Male
+                  </button>
                 </div>
               </div>
-              <div>
-                <p className="mb-2 text-sm font-semibold text-slate-400">Voice</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => setVoiceStyle("female")} className={`rounded-xl px-3 py-2 text-sm font-semibold ${voiceStyle === "female" ? "bg-blue-500 text-white" : isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-700"}`}>Female</button>
-                  <button onClick={() => setVoiceStyle("male")} className={`rounded-xl px-3 py-2 text-sm font-semibold ${voiceStyle === "male" ? "bg-blue-500 text-white" : isDark ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-700"}`}>Male</button>
+
+              <div className={`rounded-[1.6rem] border p-4 ${palette.softCard}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className={`text-sm font-semibold ${palette.muted}`}>Speech speed</p>
+                    <p className={`mt-1 text-lg font-semibold ${palette.heading}`}>{speechRate.toFixed(1)}x</p>
+                  </div>
+                  <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${palette.pill}`}>
+                    <SlidersHorizontal size={14} />
+                    Up to 2x
+                  </div>
                 </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {QUICK_RATES.map((rate) => (
+                    <button
+                      key={rate}
+                      onClick={() => setSpeechRate(rate)}
+                      className={`rounded-2xl px-3 py-2 text-sm font-semibold transition ${
+                        speechRate === rate ? `${palette.accentSolid} shadow-lg` : palette.secondaryButton
+                      }`}
+                    >
+                      {rate.toFixed(rate === 1 ? 0 : 1)}x
+                    </button>
+                  ))}
+                </div>
+
+                <input
+                  type="range"
+                  min={MIN_RATE}
+                  max={MAX_RATE}
+                  step="0.1"
+                  value={speechRate}
+                  onChange={(event) => setSpeechRate(Number(event.target.value))}
+                  className="mt-4 w-full accent-sky-500"
+                />
               </div>
-              <div>
-                <p className="mb-2 text-sm font-semibold text-slate-400">Speech Speed: {speechRate.toFixed(1)}x</p>
-                <input type="range" min="0.6" max="1.4" step="0.1" value={speechRate} onChange={(event) => setSpeechRate(Number(event.target.value))} className="w-full accent-blue-500" />
+
+              <div className={`rounded-[1.6rem] border p-4 ${palette.softCard}`}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className={`text-sm font-semibold ${palette.muted}`}>Camera</p>
+                    <p className={`mt-1 text-sm ${palette.subheading}`}>Use the live preview when needed, or switch it off for privacy.</p>
+                  </div>
+                  <button
+                    onClick={() => setCameraEnabled((current) => !current)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${cameraEnabled ? `${palette.accentSolid} shadow-lg` : palette.secondaryButton}`}
+                  >
+                    {cameraEnabled ? "On" : "Off"}
+                  </button>
+                </div>
               </div>
             </div>
           </section>
         )}
       </div>
 
-      <nav className={`fixed bottom-4 left-1/2 flex w-[calc(100%-2rem)] max-w-[560px] -translate-x-1/2 items-center justify-around rounded-[2rem] border p-3 shadow-[0_16px_34px_rgba(15,23,42,0.16)] md:hidden ${isDark ? "border-slate-700 bg-slate-900" : "border-slate-200 bg-white"}`}>
-        <button onClick={() => setActiveTab("home")} className={`flex h-12 w-12 items-center justify-center rounded-full ${activeTab === "home" ? "bg-blue-500 text-white" : isDark ? "text-slate-300" : "text-slate-500"}`}>
+      <nav className={`fixed bottom-4 left-1/2 flex w-[calc(100%-2rem)] max-w-[560px] -translate-x-1/2 items-center justify-around rounded-[2rem] border p-3 shadow-[0_16px_34px_rgba(15,23,42,0.16)] backdrop-blur md:hidden ${palette.nav}`}>
+        <button
+          onClick={() => setActiveTab("home")}
+          className={`flex h-12 w-12 items-center justify-center rounded-full ${activeTab === "home" ? `${palette.accentSolid}` : isDark ? "text-slate-300" : "text-slate-500"}`}
+        >
           <HomeIcon size={22} />
         </button>
-        <button onClick={() => setActiveTab("settings")} className={`flex h-12 w-12 items-center justify-center rounded-full ${activeTab === "settings" ? "bg-indigo-500 text-white" : isDark ? "text-slate-300" : "text-slate-500"}`}>
+        <button
+          onClick={() => setActiveTab("settings")}
+          className={`flex h-12 w-12 items-center justify-center rounded-full ${activeTab === "settings" ? `${palette.accentSolid}` : isDark ? "text-slate-300" : "text-slate-500"}`}
+        >
           <SettingsIcon size={22} />
         </button>
       </nav>
