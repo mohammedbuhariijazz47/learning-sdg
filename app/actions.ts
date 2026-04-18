@@ -346,7 +346,12 @@ export async function generateAnswer(question: string, language: Language = "en"
   }
 
   const qLower = normalized.toLowerCase();
-  if (qLower.includes("sdg") || qLower.includes("sustainable development") || qLower.includes("sustainable development goals")) {
+  const wantsFullSdgReport =
+    /\b(detailed|full|complete|professional|long)\b.*\b(report|essay|paper)\b/i.test(normalized) ||
+    /\b(report|essay|paper)\b.*\b(sustainable development|sdgs?)\b/i.test(normalized) ||
+    /\b(write|prepare|give)\s+(a\s+)?(detailed\s+)?(report|essay)\b.*\b(sdg|sustainable development)/i.test(normalized);
+
+  if (wantsFullSdgReport) {
     return {
       title: "Sustainable Development Goals (SDGs)",
       description: "Detailed Professional Report",

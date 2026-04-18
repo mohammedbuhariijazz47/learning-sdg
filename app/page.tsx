@@ -19,6 +19,7 @@ import {
   Square,
 } from "lucide-react";
 import { generateAnswer } from "./actions";
+import { SUGGESTED_SDG_QUESTIONS } from "../lib/sdgQA";
 
 interface SpeechRecognition extends EventTarget {
   continuous: boolean;
@@ -77,6 +78,17 @@ const STORAGE_KEYS = {
 const MIN_RATE = 0.8;
 const MAX_RATE = 2;
 const QUICK_RATES = [1, 1.5, 2];
+
+const SUGGESTION_CHIP_STYLES = [
+  "bg-gradient-to-r from-pink-400 to-rose-500 text-white border-pink-200/60 shadow-[0_10px_24px_rgba(244,63,94,0.35)]",
+  "bg-gradient-to-r from-amber-400 to-orange-500 text-amber-950 border-amber-200/60 shadow-[0_10px_24px_rgba(251,146,60,0.35)]",
+  "bg-gradient-to-r from-sky-400 to-indigo-500 text-white border-sky-200/60 shadow-[0_10px_24px_rgba(56,189,248,0.35)]",
+  "bg-gradient-to-r from-emerald-400 to-teal-500 text-emerald-950 border-emerald-200/60 shadow-[0_10px_24px_rgba(16,185,129,0.35)]",
+  "bg-gradient-to-r from-violet-400 to-purple-600 text-white border-violet-200/60 shadow-[0_10px_24px_rgba(139,92,246,0.35)]",
+  "bg-gradient-to-r from-cyan-400 to-blue-500 text-white border-cyan-200/60 shadow-[0_10px_24px_rgba(34,211,238,0.35)]",
+  "bg-gradient-to-r from-fuchsia-400 to-pink-600 text-white border-fuchsia-200/60 shadow-[0_10px_24px_rgba(217,70,239,0.35)]",
+  "bg-gradient-to-r from-lime-400 to-green-600 text-lime-950 border-lime-200/60 shadow-[0_10px_24px_rgba(132,204,22,0.35)]",
+] as const;
 
 const useSpeechRecognition = (onResult: (text: string) => void) => {
   const [isListening, setIsListening] = useState(false);
@@ -277,36 +289,38 @@ export default function Home() {
     () =>
       isDark
         ? {
-            page: "bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_32%),linear-gradient(180deg,#020617_0%,#0f172a_45%,#111827_100%)] text-slate-100",
-            card: "border-slate-700/80 bg-slate-900/80",
-            softCard: "border-slate-700/70 bg-slate-900/60",
-            muted: "text-slate-400",
+            page: "bg-[radial-gradient(ellipse_at_15%_0%,rgba(244,114,182,0.22),transparent_45%),radial-gradient(ellipse_at_85%_5%,rgba(250,204,21,0.18),transparent_42%),radial-gradient(ellipse_at_50%_100%,rgba(45,212,191,0.16),transparent_50%),linear-gradient(180deg,#0b1020_0%,#111827_50%,#1e1b4b_100%)] text-slate-100",
+            card: "border-2 border-fuchsia-500/35 bg-slate-900/88 shadow-[0_24px_60px_rgba(168,85,247,0.18)]",
+            softCard: "border-2 border-cyan-400/25 bg-slate-900/65 shadow-inner",
+            muted: "text-slate-300",
             heading: "text-slate-50",
-            subheading: "text-slate-300",
-            pill: "bg-cyan-500/15 text-cyan-200 border border-cyan-400/25",
-            accent: "from-cyan-400 to-blue-500",
-            accentSolid: "bg-cyan-500 text-slate-950",
-            secondaryButton: "bg-slate-800 text-slate-200",
-            input: "border-slate-700 bg-slate-950/80 text-slate-100 placeholder:text-slate-500",
-            answerPanel: "border-slate-700 bg-slate-950/85 text-slate-200",
-            visualPanel: "border-slate-700 bg-slate-950",
-            nav: "border-slate-700 bg-slate-900/90",
+            subheading: "text-slate-200",
+            pill: "bg-gradient-to-r from-fuchsia-500/25 to-cyan-500/20 text-fuchsia-100 border border-fuchsia-400/35",
+            accent: "from-fuchsia-500 via-amber-400 to-cyan-400",
+            accentSolid: "bg-gradient-to-r from-fuchsia-500 to-cyan-400 text-slate-950 shadow-lg shadow-fuchsia-500/30",
+            secondaryButton: "bg-slate-800/90 text-slate-100 border border-slate-600/60",
+            input: "border-2 border-cyan-500/30 bg-slate-950/90 text-slate-100 placeholder:text-slate-400",
+            answerPanel: "border-2 border-violet-500/30 bg-slate-950/90 text-slate-100",
+            visualPanel: "border-2 border-cyan-500/25 bg-slate-950",
+            nav: "border-2 border-fuchsia-500/35 bg-slate-900/95",
+            heroIcon: "from-fuchsia-500 via-amber-400 to-cyan-400",
           }
         : {
-            page: "bg-[radial-gradient(circle_at_top,_rgba(125,211,252,0.45),_transparent_30%),linear-gradient(180deg,#f7fcff_0%,#eef8ff_55%,#fff6e8_100%)] text-slate-900",
-            card: "border-white/70 bg-white/85",
-            softCard: "border-sky-100 bg-white/75",
+            page: "bg-[radial-gradient(ellipse_at_18%_0%,rgba(251,113,133,0.38),transparent_48%),radial-gradient(ellipse_at_82%_8%,rgba(250,204,21,0.32),transparent_46%),radial-gradient(ellipse_at_50%_100%,rgba(52,211,153,0.28),transparent_42%),linear-gradient(180deg,#fff7fb_0%,#f0f9ff_38%,#fffbeb_100%)] text-slate-900",
+            card: "border-2 border-white/80 bg-white/92 shadow-[0_26px_70px_rgba(236,72,153,0.14)]",
+            softCard: "border-2 border-pink-100 bg-gradient-to-br from-white/95 to-sky-50/90 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]",
             muted: "text-slate-600",
             heading: "text-slate-900",
             subheading: "text-slate-700",
-            pill: "bg-sky-100 text-sky-700 border border-sky-200",
-            accent: "from-sky-500 via-cyan-500 to-emerald-400",
-            accentSolid: "bg-sky-500 text-white",
-            secondaryButton: "bg-sky-50 text-slate-700",
-            input: "border-sky-100 bg-white text-slate-700 placeholder:text-slate-400",
-            answerPanel: "border-sky-100 bg-white text-slate-800",
-            visualPanel: "border-sky-100 bg-[#f8fbff]",
-            nav: "border-white/80 bg-white/90",
+            pill: "bg-gradient-to-r from-pink-100 via-amber-100 to-emerald-100 text-pink-800 border-2 border-pink-200/80",
+            accent: "from-pink-500 via-amber-400 to-teal-400",
+            accentSolid: "bg-gradient-to-r from-pink-500 via-orange-400 to-teal-400 text-white shadow-lg shadow-pink-400/35",
+            secondaryButton: "bg-white/90 text-slate-800 border-2 border-pink-100 shadow-sm",
+            input: "border-2 border-sky-200 bg-white text-slate-800 placeholder:text-slate-400 shadow-inner",
+            answerPanel: "border-2 border-violet-100 bg-gradient-to-br from-white to-violet-50/80 text-slate-800",
+            visualPanel: "border-2 border-sky-100 bg-gradient-to-br from-sky-50 to-emerald-50",
+            nav: "border-2 border-pink-100 bg-white/95 shadow-[0_18px_40px_rgba(236,72,153,0.18)]",
+            heroIcon: "from-pink-500 via-amber-400 to-teal-400",
           },
     [isDark]
   );
@@ -319,6 +333,7 @@ export default function Home() {
       stopListening: "Stop Listening",
       typeQuestion: "Type your question...",
       ask: "Ask",
+      tryQuestions: "Try a colorful question",
       lastQuestion: "Last question",
       answerVisual: "AI Answer & Visual",
       ready: "Ready",
@@ -395,13 +410,21 @@ export default function Home() {
     setTypedQuestion("");
   };
 
+  const askSuggestion = (suggestion: string) => {
+    const text = suggestion.trim();
+    if (!text || isLoading) return;
+    setTypedQuestion("");
+    setQuery(text);
+    void processInput(text);
+  };
+
   return (
     <main className={`min-h-screen px-4 pb-28 pt-5 md:px-8 md:pb-10 md:pt-8 ${palette.page}`}>
       <div className="mx-auto w-full max-w-[560px] md:max-w-[1120px]">
         <header className={`rounded-[2rem] border px-4 py-4 shadow-[0_22px_60px_rgba(15,23,42,0.12)] backdrop-blur md:px-7 md:py-6 ${palette.card}`}>
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3 md:gap-4">
-              <div className={`flex h-14 w-14 items-center justify-center rounded-[1.5rem] bg-gradient-to-br ${palette.accent} text-white shadow-lg md:h-16 md:w-16`}>
+              <div className={`flex h-14 w-14 items-center justify-center rounded-[1.5rem] bg-gradient-to-br ${palette.heroIcon} text-white shadow-lg md:h-16 md:w-16`}>
                 <GraduationCap size={26} />
               </div>
               <div>
@@ -485,8 +508,28 @@ export default function Home() {
                       }
                     }}
                     placeholder={labels.typeQuestion}
-                    className={`min-h-[96px] w-full resize-none rounded-[1.35rem] border px-4 py-3 text-base outline-none ring-sky-500/30 focus:ring-4 ${palette.input}`}
+                    className={`min-h-[96px] w-full resize-none rounded-[1.35rem] border px-4 py-3 text-base outline-none ring-pink-400/35 focus:ring-4 ${palette.input}`}
                   />
+
+                  <div className="space-y-2 pt-1">
+                    <p className={`text-sm font-bold tracking-tight ${palette.heading}`}>{labels.tryQuestions}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {SUGGESTED_SDG_QUESTIONS.map((suggestion, index) => (
+                        <button
+                          key={suggestion}
+                          type="button"
+                          onClick={() => askSuggestion(suggestion)}
+                          disabled={isLoading}
+                          className={`max-w-full rounded-full border-2 px-3.5 py-2 text-left text-xs font-bold leading-snug shadow-md transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 md:text-sm ${
+                            SUGGESTION_CHIP_STYLES[index % SUGGESTION_CHIP_STYLES.length]
+                          }`}
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between gap-3">
                     <p className={`truncate text-sm ${palette.muted}`}>
                       {query ? `${labels.lastQuestion}: ${query}` : "You can ask by typing or using your microphone."}
